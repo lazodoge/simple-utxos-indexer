@@ -9,7 +9,7 @@ import { getBlock, getlatestBlock, getTransaction } from "./rpc";
 import "./server";
 
 //define the start height
-const START_HEIGHT = 3131019;
+const START_HEIGHT = parseInt(process.env.START_HEIGHT || "3131019");
 
 const indexUTXOs = async (blockHeight: number) => {
   const block = await getBlock(blockHeight);

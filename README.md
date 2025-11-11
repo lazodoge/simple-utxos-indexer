@@ -31,6 +31,9 @@ MONGO_URI=mongodb://localhost:27017
 
 # Zcash JSON-RPC endpoint (replace user:pass/host/port as appropriate)
 ZCASH_RPC_URL=http://user:pass@127.0.0.1:8232
+
+START_HEIGHT="START_BLOCK_HEIGHT"
+
 ```
 
 3. Start the indexer and API server:
