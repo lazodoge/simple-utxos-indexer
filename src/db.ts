@@ -5,15 +5,48 @@ import dotenv from "dotenv";
 dotenv.config();
 
 let db: Db | null = null;
+let indexesCreated = false;
 
 const getDB = async () => {
   try {
     if (db) return db;
     const client = await MongoClient.connect(process.env.MONGO_URI!);
     db = client.db("utxo-indexer");
+
+    // Create indexes only once on first connection
+    if (!indexesCreated) {
+      await ensureIndexes();
+      indexesCreated = true;
+    }
+
     return db;
   } catch (error) {
     console.error("Error connecting to MongoDB:", error);
+    throw error;
+  }
+};
+
+const ensureIndexes = async () => {
+  try {
+    if (!db) return;
+
+    const collection = db.collection<UTXO>("utxos");
+    const existingIndexes = await collection.indexes();
+    const indexNames = existingIndexes.map((idx) => idx.name);
+
+    // Create index on 'id' field (unique) for fast lookups and deletes
+    if (!indexNames.includes("id_1")) {
+      await collection.createIndex({ id: 1 }, { unique: true });
+      console.log("Created unique index on 'id' field");
+    }
+
+    // Create index on 'address' field for fast queries by address
+    if (!indexNames.includes("address_1")) {
+      await collection.createIndex({ address: 1 });
+      console.log("Created index on 'address' field");
+    }
+  } catch (error) {
+    console.error("Error creating indexes:", error);
     throw error;
   }
 };
@@ -22,16 +55,6 @@ export const saveUTXOs = async (utxos: UTXO[]) => {
   try {
     const db = await getDB();
     await db.collection<UTXO>("utxos").insertMany(utxos);
-
-    if (!db.collection<UTXO>("utxos").indexExists(["id", "address"])) {
-      await db
-        .collection<UTXO>("utxos")
-        .createIndex({ id: 1 }, { unique: true });
-
-      await db
-        .collection<UTXO>("utxos")
-        .createIndex({ address: 1 }, { unique: false });
-    }
   } catch (error) {
     console.error("Error saving UTXOs:", error);
     throw error;
@@ -60,6 +83,20 @@ export const deleteSpentUTXOs = async (id: string) => {
     return deleted;
   } catch (error) {
     console.error("Error deleting spent UTXO:", error);
+    throw error;
+  }
+};
+
+export const batchDeleteSpentUTXOs = async (ids: string[]) => {
+  try {
+    if (ids.length === 0) return 0;
+    const db = await getDB();
+    const result = await db
+      .collection<UTXO>("utxos")
+      .deleteMany({ id: { $in: ids } });
+    return result.deletedCount;
+  } catch (error) {
+    console.error("Error batch deleting spent UTXOs:", error);
     throw error;
   }
 };

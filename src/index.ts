@@ -1,5 +1,5 @@
 import {
-  deleteSpentUTXOs,
+  batchDeleteSpentUTXOs,
   getIndexingCheckpoint,
   saveUTXOs,
   updateIndexingCheckpoint,
@@ -62,9 +62,11 @@ const indexUTXOs = async (blockHeight: number) => {
     await saveUTXOs(outputs);
   }
 
-  console.log(`Cleaning up ${inputs.length} spent utxos`);
-  for (const input of inputs) {
-    await deleteSpentUTXOs(input.id);
+  if (inputs.length > 0) {
+    console.log(`Cleaning up ${inputs.length} spent utxos`);
+    const inputIds = inputs.map((input) => input.id);
+    const deletedCount = await batchDeleteSpentUTXOs(inputIds);
+    console.log(`Deleted ${deletedCount} spent utxos`);
   }
 };
 
