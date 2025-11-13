@@ -14,7 +14,7 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
-app.use(cors());
+app.use(cors({ origin: "*" }));
 
 app.get("/api/utxos/:address", async (req, res) => {
   const { address } = req.params;
