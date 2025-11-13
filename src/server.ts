@@ -1,9 +1,19 @@
 import express from "express";
 import cors from "cors";
 import { getUTXOs } from "./db";
+import { rateLimit } from "express-rate-limit";
 
 const app = express();
 
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 15 minutes
+  limit: 1,
+  standardHeaders: "draft-8", // draft-6: `RateLimit-*` headers; draft-7 & draft-8: combined `RateLimit` header
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers.
+  ipv6Subnet: 56, // Set to 60 or 64 to be less aggressive, or 52 or 48 to be more aggressive
+});
+
+app.use(limiter);
 app.use(cors());
 
 app.get("/api/utxos/:address", async (req, res) => {
