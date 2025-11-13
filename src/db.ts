@@ -55,16 +55,14 @@ export const getUTXOs = async (address: string) => {
 export const deleteSpentUTXOs = async (id: string) => {
   try {
     const db = await getDB();
-    const deleted = (await db.collection<UTXO>("utxos").deleteOne({ id }))
+    const deleted = (await db.collection<UTXO>("utxos").deleteOne({ id: id }))
       .acknowledged;
-
     return deleted;
   } catch (error) {
-    console.error("Error deleting spent UTXOs:", error);
+    console.error("Error deleting spent UTXO:", error);
     throw error;
   }
 };
-
 export const updateIndexingCheckpoint = async (blockHeight: number) => {
   try {
     const db = await getDB();

@@ -62,6 +62,7 @@ const indexUTXOs = async (blockHeight: number) => {
     await saveUTXOs(outputs);
   }
 
+  console.log(`Cleaning up ${inputs.length} spent utxos`);
   for (const input of inputs) {
     await deleteSpentUTXOs(input.id);
   }
