@@ -36,8 +36,49 @@ const ensureIndexes = async () => {
 
     // Create index on 'id' field (unique) for fast lookups and deletes
     if (!indexNames.includes("id_1")) {
-      await collection.createIndex({ id: 1 }, { unique: true });
-      console.log("Created unique index on 'id' field");
+      try {
+        // First, remove duplicates if any exist
+        const pipeline = [
+          {
+            $group: {
+              _id: "$id",
+              count: { $sum: 1 },
+              docs: { $push: "$_id" },
+            },
+          },
+          {
+            $match: {
+              count: { $gt: 1 },
+            },
+          },
+        ];
+
+        const duplicates = await collection.aggregate(pipeline).toArray();
+
+        if (duplicates.length > 0) {
+          console.log(
+            `Found ${duplicates.length} duplicate UTXO groups, cleaning up...`
+          );
+
+          for (const dup of duplicates) {
+            // Keep the first document, delete the rest
+            const docsToDelete = (dup.docs as any[]).slice(1);
+            await collection.deleteMany({ _id: { $in: docsToDelete } });
+          }
+
+          console.log(`Removed duplicate UTXOs`);
+        }
+
+        await collection.createIndex({ id: 1 }, { unique: true });
+        console.log("Created unique index on 'id' field");
+      } catch (indexError: any) {
+        if (indexError.code === 11000) {
+          console.error(
+            "Still have duplicates after cleanup. Please manually clean the database."
+          );
+        }
+        throw indexError;
+      }
     }
 
     // Create index on 'address' field for fast queries by address
@@ -54,8 +95,21 @@ const ensureIndexes = async () => {
 export const saveUTXOs = async (utxos: UTXO[]) => {
   try {
     const db = await getDB();
-    await db.collection<UTXO>("utxos").insertMany(utxos);
-  } catch (error) {
+    // Use ordered: false to continue inserting even if some documents fail due to duplicates
+    await db.collection<UTXO>("utxos").insertMany(utxos, { ordered: false });
+  } catch (error: any) {
+    // If it's a duplicate key error (code 11000), only log a warning for the duplicates
+    // but don't throw - some inserts may have succeeded
+    if (error.code === 11000) {
+      const insertedCount = error.result?.nInserted || 0;
+      const duplicateCount = utxos.length - insertedCount;
+      if (duplicateCount > 0) {
+        console.warn(
+          `Skipped ${duplicateCount} duplicate UTXOs, inserted ${insertedCount}`
+        );
+      }
+      return; // Don't throw, continue execution
+    }
     console.error("Error saving UTXOs:", error);
     throw error;
   }
