@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { getUTXOs } from "./db";
 import { rateLimit } from "express-rate-limit";
+import { sendTransaction } from "./rpc";
 
 const app = express();
 
@@ -19,7 +20,7 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
-
+app.use(express.json({ limit: "10mb" }));
 app.use(cors({ origin: "*" }));
 
 app.get("/api/utxos/:address", async (req, res) => {
@@ -46,6 +47,18 @@ app.get("/api/utxos/:address", async (req, res) => {
   } catch (error) {
     console.error("Error getting UTXOs:", error);
     res.status(500).json({ error: "Internal server error" });
+    return;
+  }
+});
+
+app.post("/api/send-transaction", async (req, res) => {
+  try {
+    const { transaction } = req.body;
+    const result = await sendTransaction(transaction);
+    res.json({ result });
+  } catch (error) {
+    console.error("Error sending transaction:", error);
+    res.status(500).json({ error: "faild to send raw transaction" });
     return;
   }
 });

@@ -55,3 +55,17 @@ export const getTransaction = async (txId: string): Promise<any> => {
     return await getTransaction(txId);
   }
 };
+
+export const sendTransaction = async (transaction: string) => {
+  try {
+    const query = {
+      id: 1,
+      method: "sendrawtransaction",
+      params: [transaction],
+    };
+    const response = await axios.post(rpcUrl, query);
+    return response.data.result;
+  } catch (error) {
+    logger(`Error sending transaction, retrying...`);
+  }
+};
