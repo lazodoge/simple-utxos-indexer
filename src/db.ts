@@ -31,42 +31,55 @@ const ensureIndexes = async () => {
     if (!db) return;
 
     const collection = db.collection<UTXO>("utxos");
-    const existingIndexes = await collection.indexes();
-    const indexNames = existingIndexes.map((idx) => idx.name);
+
+    // Check if collection exists by listing collections
+    const collections = await db.listCollections({ name: "utxos" }).toArray();
+    const collectionExists = collections.length > 0;
+
+    let existingIndexes: any[] = [];
+    let indexNames: string[] = [];
+
+    // Only get existing indexes if collection exists
+    if (collectionExists) {
+      existingIndexes = await collection.indexes();
+      indexNames = existingIndexes.map((idx) => idx.name);
+    }
 
     // Create index on 'id' field (unique) for fast lookups and deletes
     if (!indexNames.includes("id_1")) {
       try {
-        // First, remove duplicates if any exist
-        const pipeline = [
-          {
-            $group: {
-              _id: "$id",
-              count: { $sum: 1 },
-              docs: { $push: "$_id" },
+        // First, remove duplicates if any exist (only if collection exists)
+        if (collectionExists) {
+          const pipeline = [
+            {
+              $group: {
+                _id: "$id",
+                count: { $sum: 1 },
+                docs: { $push: "$_id" },
+              },
             },
-          },
-          {
-            $match: {
-              count: { $gt: 1 },
+            {
+              $match: {
+                count: { $gt: 1 },
+              },
             },
-          },
-        ];
+          ];
 
-        const duplicates = await collection.aggregate(pipeline).toArray();
+          const duplicates = await collection.aggregate(pipeline).toArray();
 
-        if (duplicates.length > 0) {
-          console.log(
-            `Found ${duplicates.length} duplicate UTXO groups, cleaning up...`
-          );
+          if (duplicates.length > 0) {
+            console.log(
+              `Found ${duplicates.length} duplicate UTXO groups, cleaning up...`
+            );
 
-          for (const dup of duplicates) {
-            // Keep the first document, delete the rest
-            const docsToDelete = (dup.docs as any[]).slice(1);
-            await collection.deleteMany({ _id: { $in: docsToDelete } });
+            for (const dup of duplicates) {
+              // Keep the first document, delete the rest
+              const docsToDelete = (dup.docs as any[]).slice(1);
+              await collection.deleteMany({ _id: { $in: docsToDelete } });
+            }
+
+            console.log(`Removed duplicate UTXOs`);
           }
-
-          console.log(`Removed duplicate UTXOs`);
         }
 
         await collection.createIndex({ id: 1 }, { unique: true });
