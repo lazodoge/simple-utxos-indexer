@@ -26,21 +26,26 @@ const indexUTXOs = async (blockHeight: number) => {
   const outputs: any[] = [];
 
   for (const [index, tx] of txs.entries()) {
-    //skip the first transaction (Coinbase transaction)
-    if (index === 0) continue;
-
     const txData = await getTransaction(tx);
 
-    inputs.push(
-      ...txData.vin.map((input: any) => {
-        return {
-          value: input.valueSat,
-          id: `${input.txid}:${input.vout}`,
-          address: input.address,
-        };
-      })
-    );
+    // For non-coinbase transactions, process inputs (spent UTXOs)
+    // Coinbase transactions (index 0) don't have valid inputs to spend
+    if (index !== 0 && txData.vin && txData.vin.length > 0) {
+      inputs.push(
+        ...txData.vin
+          .filter((input: any) => input.txid && input.vout !== undefined) // Filter out coinbase inputs
+          .map((input: any) => {
+            return {
+              value: input.valueSat,
+              id: `${input.txid}:${input.vout}`,
+              address: input.address,
+            };
+          })
+      );
+    }
 
+    // Process outputs for ALL transactions including coinbase
+    // These are the new UTXOs being created
     outputs.push(
       ...txData.vout
         .map((output: any) => {
@@ -126,15 +131,14 @@ const startIndexing = async () => {
       }`
     );
 
-    // Process all blocks in the batch concurrently
     try {
-      await Promise.all(
-        blockHeights.map(async (height) => {
-          logger(`Indexing block ${height}`);
-          await indexUTXOs(height);
-          logger(`Successfully indexed block ${height}`);
-        })
-      );
+      // Process blocks sequentially to avoid race conditions
+      // (UTXOs created in block N might be spent in block N+1)
+      for (const height of blockHeights) {
+        logger(`Indexing block ${height}`);
+        await indexUTXOs(height);
+        logger(`Successfully indexed block ${height}`);
+      }
 
       // Update current block height after successful batch processing
       currentBlockHeight += batchSize;
