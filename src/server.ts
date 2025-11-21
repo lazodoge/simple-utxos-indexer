@@ -25,8 +25,10 @@ app.use(cors({ origin: "*" }));
 
 app.get("/api/utxos/:address", async (req, res) => {
   const { address } = req.params;
+  const limit = parseInt(req.query.limit as string) || 10000;
+  const offset = parseInt(req.query.offset as string) || 0;
   try {
-    const utxos = await getUTXOs(address);
+    const utxos = await getUTXOs(address, limit, offset);
 
     if (!utxos || utxos.length === 0) {
       res.status(404).json({ error: "No UTXOs found for this address" });

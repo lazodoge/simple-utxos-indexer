@@ -196,12 +196,19 @@ export const deleteMempoolUTXOs = async (utxoIds: string[]) => {
   }
 };
 
-export const getUTXOs = async (address: string) => {
+export const getUTXOs = async (
+  address: string,
+  limit: number,
+  offset: number
+) => {
   try {
     const db = await getDB();
     const utxos = await db
       .collection<UTXO>("utxos")
-      .find({ address })
+      .find({ address }, { allowDiskUse: true })
+      .sort({ value: -1 })
+      .skip(offset)
+      .limit(limit)
       .toArray();
     return utxos;
   } catch (error) {
