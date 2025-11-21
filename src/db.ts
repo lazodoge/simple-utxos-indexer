@@ -206,8 +206,9 @@ export const getUTXOs = async (
     const utxos = await db
       .collection<UTXO>("utxos")
       .find({ address: address })
-      .allowDiskUse(true)
       .sort({ value: -1 })
+      .allowDiskUse(true)
+
       .skip(offset)
       .limit(limit)
       .toArray();
